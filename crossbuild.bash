@@ -1,7 +1,7 @@
 #!/bin/bash
 # This script uses the "crossbuild" Docker container to cross-compile the
 # toolchain for various platforms.
-USAGE="$(echo <<'EOF'
+USAGE="$(cat <<EOF
 Usage: 
     $0 install-docker
       - Install Docker for you if your system meets certain requirements
@@ -52,10 +52,11 @@ function check_docker()
     echo "$0: Or follow the manual install instructions for Docker at" >&2
     echo "$0:   https://docs.docker.com/engine/installation/" >&2
     exit 1  
-  endif
+  fi
 }
 
 function check_crossbuild()
+{
   if [ -z "$DOCKER_CONTAINER_NAME" ]
   then
     DOCKER_CONTAINER_NAME="$(sudo docker images multiarch/crossbuild --format "{{.Repository}}:{{.Tag}}")"
@@ -296,7 +297,7 @@ case $1 in
     exit 1
   ;;
 
-  *)
+  *)    
     echo "$USAGE" >&2
     exit 1  
 esac
