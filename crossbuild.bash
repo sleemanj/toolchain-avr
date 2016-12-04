@@ -199,44 +199,48 @@ case $1 in
     check_crossbuild
     
     # The tools we need, they get built outside the container
-    if ./tools.bash
+    if ! [ -d toolsdir ]
     then
-      # For the canadian cross compile       
-      #   [Us (Build)] x [Host] x [avr]       
-      # we need first to build
-      #   [ Us ] x [avr]
-      # don't ask why, we just do OK
-      if ! [ -d objdir-$(uname -i) ]
+      if ! ./tools.bash 
       then
-        echo "First we need to build avr-gcc for $(uname -i) as the cross compile needs it, doing that now."
-        
-        if sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$(uname -i) $DOCKER_CONTAINER_NAME $0 _compile $(uname -i)
-        then
-          mv objdir objdir-$(uname -i)
-          echo "The $(uname -i) compile is done, so now building avr-gcc for $2"
-        else
-          echo "The $(uname -i) compile failed, sorry." >&2
-          exit 1
-        fi        
-      fi
-
-      # Check to see if the cross-compile we requested was not really a cross-compile, and if so
-      # just use the straight compiled one (well, it's still a cross from build to avr, but anyway you know what I mean)
-      if [ "$(sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$2 $DOCKER_CONTAINER_NAME $0 _canonical_cross_triple)" =  "$(sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE==$(uname -i) $DOCKER_CONTAINER_NAME $0 _canonical_cross_triple)" ]
-      then
-        echo "... actually, we don't need to do that, just copying the one we already compiled for $(uname -i) as it is the same."
-        cp -rp objdir-$(uname -i) objdir
-        exit $?
-      fi
-               
-      # Now we can call ourself in the docker and get the build happening
-      sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$2 $DOCKER_CONTAINER_NAME $0 _compile $2
-      exit $?  
+        echo "$0: Failed to compile the necessary tools." >&2
+        [ -e toolsdir ] && echo "$0: Delete toolsdir before trying again." >&2
+        exit 1
+      fi    
+    fi
       
-    else
-      echo "$0: Tools build failed, correct the problem, or ensure that tools.build exits with 0 status." >&2
-      exit 1
-    fi    
+    # For the canadian cross compile       
+    #   [Us (Build)] x [Host] x [avr]       
+    # we need first to build
+    #   [ Us ] x [avr]
+    # don't ask why, we just do OK
+    if ! [ -d objdir-$(uname -i) ]
+    then
+      echo "First we need to build avr-gcc for $(uname -i) as the cross compile needs it, doing that now."
+      
+      if sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$(uname -i) $DOCKER_CONTAINER_NAME $0 _compile $(uname -i)
+      then
+        mv objdir objdir-$(uname -i)
+        echo "The $(uname -i) compile is done, so now building avr-gcc for $2"
+      else
+        echo "The $(uname -i) compile failed, sorry." >&2
+        exit 1
+      fi        
+    fi
+
+    # Check to see if the cross-compile we requested was not really a cross-compile, and if so
+    # just use the straight compiled one (well, it's still a cross from build to avr, but anyway you know what I mean)
+    if [ "$(sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$2 $DOCKER_CONTAINER_NAME $0 _canonical_cross_triple)" =  "$(sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE==$(uname -i) $DOCKER_CONTAINER_NAME $0 _canonical_cross_triple)" ]
+    then
+      echo "... actually, we don't need to do that, just copying the one we already compiled for $(uname -i) as it is the same."
+      cp -rp objdir-$(uname -i) objdir
+      exit $?
+    fi
+              
+    # Now we can call ourself in the docker and get the build happening
+    sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$2 $DOCKER_CONTAINER_NAME $0 _compile $2
+    exit $?  
+    
   ;;
    
   _canonical_cross_triple)
