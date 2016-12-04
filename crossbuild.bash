@@ -90,7 +90,7 @@ function tweak_docker_container()
 #!/bin/bash
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export LD_LIBRARY_PATH=/usr/lib:/lib
-/usr/bin/${NATIVE_BIN} "\$@"
+${NATIVE_BIN} "\$@"
 EOF
       chmod +x /usr/bin/$native    
     fi
