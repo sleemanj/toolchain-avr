@@ -362,22 +362,22 @@ case $1 in
     CROSS_TRIPLE=i386-linux-gnu
     sudo apt-get -y install gcc-multilib g++multi-lib
     
-   for native in gcc g++
-  do
-    if [ -L /usr/bin/$native ]
-    then
-      NATIVE_BIN="$(realpath /usr/bin/$native)"
-      rm /usr/bin/$native
-      cat >/usr/bin/$native <<EOF
+    for native in gcc g++
+    do
+      if [ -L /usr/bin/$native ]
+      then
+        NATIVE_BIN="$(realpath /usr/bin/$native)"
+        rm /usr/bin/$native
+        cat >/usr/bin/$native <<EOF
 #!/bin/bash
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export LD_LIBRARY_PATH=/usr/lib:/lib
 ${NATIVE_BIN} -m32 "\$@"
 EOF
-      chmod +x /usr/bin/$native    
-    fi
-  done
-    
+        chmod +x /usr/bin/$native    
+      fi
+    done
+  
     # Now we can carry on as normal
     $0 _compile
   ;;
