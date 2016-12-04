@@ -6,7 +6,7 @@ Usage:
     $0 install-docker
       - Install Docker for you if your system meets certain requirements
       
-    $1 install-crossbuild
+    $0 install-crossbuild
       - Install the crossbuild Docker Container
     
     $0 compile {target}
@@ -184,7 +184,7 @@ case $1 in
     # This needs to be called from outside the container
     if ! [ -z "$CROSS_TRIPLE" ]
     then
-      echo "$0: compile needs to be called from outside the Docker container." >&2
+      echo "$0: $1 needs to be called from outside the Docker container." >&2
       exit 1
     fi
 
@@ -233,6 +233,7 @@ case $1 in
     if [ "$(sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$2 $DOCKER_CONTAINER_NAME $0 _canonical_cross_triple)" =  "$(sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE==$(uname -m) $DOCKER_CONTAINER_NAME $0 _canonical_cross_triple)" ]
     then
       echo "... actually, we don't need to do that, just copying the one we already compiled for $(uname -m) as it is the same."
+      rm -rf objdir
       cp -rp objdir-$(uname -m) objdir
       exit $?
     fi
@@ -247,7 +248,7 @@ case $1 in
     # This needs to be called from inside the container
     if [ -z "$CROSS_TRIPLE" ]
     then
-      echo "$0: _compile needs to be called from inside the Docker container." >&2
+      echo "$0: $1 needs to be called from inside the Docker container." >&2
       exit 1
     fi
     echo $CROSS_TRIPLE
@@ -258,7 +259,7 @@ case $1 in
     # This needs to be called from inside the container
     if [ -z "$CROSS_TRIPLE" ]
     then
-      echo "$0: _compile needs to be called from inside the Docker container." >&2
+      echo "$0: $1 needs to be called from inside the Docker container." >&2
       exit 1
     fi
 
@@ -285,20 +286,37 @@ case $1 in
     export CONFARGS="--build=$(uname -m)-pc-linux-gnu --host=$CROSS_TRIPLE $CONFARGS"
     
     # Everything cleaned up, except toolsdir which we keep
-    rm -rf gcc gmp-${GMP_VERSION} mpc-${MPC_VERSION} mpfr-${MPFR_VERSION} binutils avr-libc libc avr8-headers gdb objdir *-build
-    
-    if ./tools.bash && \
-       ./binutils.build.bash && \
-       ./gcc.build.bash && \
-       ./avr-libc.build.bash && \
-       ./gdb.build.bash
-    then
-      echo "$1" >objdir/.build_target
-      echo "Your build is complete, the files are in objdir"
-      exit 0
-    fi
-    
-    exit 1
+    rm -rf gcc gmp-${GMP_VERSION} mpc-${MPC_VERSION} mpfr-${MPFR_VERSION} binutils avr-libc libc avr8-headers gdb objdir
+        
+    # Compile the subunits in order, note that the tools are already done (outside of the container)
+    for subunit in binutils gcc avr-libc gdb
+    do
+      if [ ! -d "${subunit}-build" ] || [ "$(cat "${subunit}-build/.build_target")" != "$CROSS_TRIPLE" ] 
+      then
+        rm -rf binutils-build
+        if ! ./${subunit}.build.bash
+        then
+          echo "$0: Failed to compile ${subunit}" >&2
+          exit 1
+        fi
+        echo $CROSS_TRIPLE >${subunit}-build/.build_target
+      else
+        # Already compiled we will just do the install again        
+        pushd ${subunit}-build
+      
+        if ! make install
+        then
+          echo "$0: Failed to install ${subunit} from precompiled ${subunit}-build" >&2
+          exit 1
+        fi
+        
+        popd
+      fi      
+    done    
+           
+    echo "$CROSS_TRIPLE" >objdir/.build_target
+    echo "Your build is complete, the files are in objdir"
+    exit 0
   ;;
 
   *)    
