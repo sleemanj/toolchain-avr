@@ -98,7 +98,7 @@ CONFARGS=" \
         --with-avrlibc=yes \
 	--with-dwarf2 \
         --disable-doc \
-	--target=avr"
+	--target=avr $CONFARGS"
 
 if [ `uname -s` == "Darwin" ]
 then
