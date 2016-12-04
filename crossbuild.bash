@@ -75,7 +75,7 @@ function check_crossbuild()
 function tweak_docker_container()
 {
   # Some extra tools we need that might not be in the container already
-  apt-get update && apt-get install flex bison texinfo
+  apt-get update && apt-get -y install flex bison texinfo
 
   # We need to be able to compile stuff for the container, in the container
   # https://github.com/multiarch/crossbuild/issues/26
@@ -142,14 +142,14 @@ case $1 in
     # Ok, now we are following the install directions which are pretty simple
     # https://docs.docker.com/engine/installation/linux/ubuntulinux/
     sudo apt-get update 
-    sudo apt-get install apt-transport-https ca-certificates linux-image-extra-$(uname -r) linux-image-extra-virtual
+    sudo apt-get -y install apt-transport-https ca-certificates linux-image-extra-$(uname -r) linux-image-extra-virtual
     sudo apt-key adv \
               --keyserver hkp://ha.pool.sks-keyservers.net:80 \
               --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
     echo "deb https://apt.dockerproject.org/repo ubuntu-$(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/docker.list
     sudo apt-get update
     
-    sudo apt-get install docker-engine
+    sudo apt-get -y install docker-engine
     sudo service docker start
     
     echo 
@@ -214,26 +214,26 @@ case $1 in
     # we need first to build
     #   [ Us ] x [avr]
     # don't ask why, we just do OK
-    if ! [ -d objdir-$(uname -i) ]
+    if ! [ -d objdir-$(uname -m) ]
     then
-      echo "First we need to build avr-gcc for $(uname -i) as the cross compile needs it, doing that now."
+      echo "First we need to build avr-gcc for $(uname -m) as the cross compile needs it, doing that now."
       
-      if sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$(uname -i) $DOCKER_CONTAINER_NAME $0 _compile $(uname -i)
+      if sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$(uname -m) $DOCKER_CONTAINER_NAME $0 _compile $(uname -m)
       then
-        mv objdir objdir-$(uname -i)
-        echo "The $(uname -i) compile is done, so now building avr-gcc for $2"
+        mv objdir objdir-$(uname -m)
+        echo "The $(uname -m) compile is done, so now building avr-gcc for $2"
       else
-        echo "The $(uname -i) compile failed, sorry." >&2
+        echo "The $(uname -m) compile failed, sorry." >&2
         exit 1
       fi        
     fi
 
     # Check to see if the cross-compile we requested was not really a cross-compile, and if so
     # just use the straight compiled one (well, it's still a cross from build to avr, but anyway you know what I mean)
-    if [ "$(sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$2 $DOCKER_CONTAINER_NAME $0 _canonical_cross_triple)" =  "$(sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE==$(uname -i) $DOCKER_CONTAINER_NAME $0 _canonical_cross_triple)" ]
+    if [ "$(sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$2 $DOCKER_CONTAINER_NAME $0 _canonical_cross_triple)" =  "$(sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE==$(uname -m) $DOCKER_CONTAINER_NAME $0 _canonical_cross_triple)" ]
     then
-      echo "... actually, we don't need to do that, just copying the one we already compiled for $(uname -i) as it is the same."
-      cp -rp objdir-$(uname -i) objdir
+      echo "... actually, we don't need to do that, just copying the one we already compiled for $(uname -m) as it is the same."
+      cp -rp objdir-$(uname -m) objdir
       exit $?
     fi
               
@@ -265,8 +265,8 @@ case $1 in
     # Make sure our container has the stuff we need
     tweak_docker_container
 
-    PATH="$(pwd)/objdir-$(uname -i)/bin:$PATH"
-    LD_LIBRARY_PATH="$(pwd)/objdir-$(uname -i)/lib:$LD_LIBRARY_PATH"
+    PATH="$(pwd)/objdir-$(uname -m)/bin:$PATH"
+    LD_LIBRARY_PATH="$(pwd)/objdir-$(uname -m)/lib:$LD_LIBRARY_PATH"
     
     # When compiling binutils and avr-gcc it needs to compile some stuff in the 
     # container for use in the container, we have to explicitly point it to the
@@ -282,7 +282,7 @@ case $1 in
     # We need to tell autoconf that we are cross compiling
     # indeed we are doing a Canadian Cross but the --target=avr is 
     # added in the build scripts.
-    export CONFARGS="--build=$(uname -i)-pc-linux-gnu --host=$1 $CONFARGS"
+    export CONFARGS="--build=$(uname -m)-pc-linux-gnu --host=$2 $CONFARGS"
     
     # Everything cleaned up, except toolsdir which we keep
     rm -rf gcc gmp-${GMP_VERSION} mpc-${MPC_VERSION} mpfr-${MPFR_VERSION} binutils avr-libc libc avr8-headers gdb objdir *-build
