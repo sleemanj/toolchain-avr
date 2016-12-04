@@ -219,6 +219,38 @@ case $1 in
     fi            
   ;;
   
+  shell)
+  # This needs to be called from outside the container
+    if ! [ -z "$CROSS_TRIPLE" ]
+    then
+      echo "$0: $1 needs to be called from outside the Docker container." >&2
+      exit 1
+    fi
+
+    if [ -z "$2" ]
+    then
+      echo "$USAGE" >&2
+      exit 1    
+    fi
+
+    # Check that docker is installed and the container is built
+    check_docker
+    check_crossbuild
+    
+    # The tools we need, they get built outside the container
+    if ! [ -d toolsdir ]
+    then
+      if ! ./tools.bash 
+      then
+        echo "$0: Failed to compile the necessary tools." >&2
+        [ -e toolsdir ] && echo "$0: Delete toolsdir before trying again." >&2
+        exit 1
+      fi    
+    fi
+    
+    sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$(canonical_cross_triple $2) $DOCKER_CONTAINER_NAME $0 _shell
+  ;;
+  
   compile)
     # This needs to be called from outside the container
     if ! [ -z "$CROSS_TRIPLE" ]
@@ -287,7 +319,7 @@ case $1 in
     fi
     
     # For all other cross compiles we are now ready to go
-    sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$2 $DOCKER_CONTAINER_NAME $0 _compile $2
+    sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$(canonical_cross_triple $2) $DOCKER_CONTAINER_NAME $0 _compile $2
     exit $?  
     
   ;;
@@ -302,7 +334,40 @@ case $1 in
     echo $CROSS_TRIPLE
     exit 0
   ;;
-  
+    
+  _shell)
+    # This needs to be called from inside the container
+    if [ -z "$CROSS_TRIPLE" ]
+    then
+      echo "$0: $1 needs to be called from inside the Docker container." >&2
+      exit 1
+    fi
+
+    # Make sure our container has the stuff we need
+    tweak_docker_container
+    
+    PATH="$(pwd)/objdir-$(uname -m)/bin:$PATH"
+    LD_LIBRARY_PATH="$(pwd)/objdir-$(uname -m)/lib:$LD_LIBRARY_PATH"
+    
+    # When compiling binutils and avr-gcc it needs to compile some stuff in the 
+    # container for use in the container, we have to explicitly point it to the
+    # right compiler to use (crossbuild has prepended the crosses in the path)
+    export CC_FOR_BUILD=/usr/bin/gcc
+    export CXX_FOR_BUILD=/usr/bin/g++
+    export AR_FOR_BUILD=/usr/bin/ar
+    export AS_FOR_BUILD=/usr/bin/as
+    export LD_FOR_BUILD=/usr/bin/ld
+    export NM_FOR_BUILD=/usr/bin/nm
+    export RANLIB_FOR_BUILD=/usr/bin/ranlib
+
+    # We need to tell autoconf that we are cross compiling
+    # indeed we are doing a Canadian Cross but the --target=avr is 
+    # added in the build scripts.
+    export CONFARGS="--build=$(uname -m)-pc-linux-gnu --host=$CROSS_TRIPLE $CONFARGS"
+        
+    bash
+  ;;
+    
   _compile)
     # This needs to be called from inside the container
     if [ -z "$CROSS_TRIPLE" ]
