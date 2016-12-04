@@ -86,11 +86,11 @@ function tweak_docker_container()
     then
       NATIVE_BIN="$(realpath /usr/bin/$native)"
       rm /usr/bin/$native
-      cat >/usr/bin/$native <<'EOF'
+      cat >/usr/bin/$native <<EOF
 #!/bin/bash
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export LD_LIBRARY_PATH=/usr/lib:/lib
-/usr/bin/${NATIVE_BIN} "$@"
+/usr/bin/${NATIVE_BIN} "\$@"
 EOF
       chmod +x /usr/bin/$native    
     fi
@@ -282,7 +282,7 @@ case $1 in
     # We need to tell autoconf that we are cross compiling
     # indeed we are doing a Canadian Cross but the --target=avr is 
     # added in the build scripts.
-    export CONFARGS="--build=$(uname -m)-pc-linux-gnu --host=$2 $CONFARGS"
+    export CONFARGS="--build=$(uname -m)-pc-linux-gnu --host=$CROSS_TRIPLE $CONFARGS"
     
     # Everything cleaned up, except toolsdir which we keep
     rm -rf gcc gmp-${GMP_VERSION} mpc-${MPC_VERSION} mpfr-${MPFR_VERSION} binutils avr-libc libc avr8-headers gdb objdir *-build
