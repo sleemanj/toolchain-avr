@@ -199,7 +199,7 @@ case $1 in
     check_crossbuild
     
     # The tools we need, they get built outside the container
-    if ./tools.build
+    if ./tools.bash
     then
       # For the canadian cross compile       
       #   [Us (Build)] x [Host] x [avr]       
