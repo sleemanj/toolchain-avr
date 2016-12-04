@@ -12,10 +12,14 @@ Usage:
     $0 compile {target}
       - Cross compile the toolchain for the given target, the resulting files 
         are left in objdir for you.
-          
-    $0 package {target} [outfile]
+              
+    $0 package {target}
       - If the compile is not done, it will do so, then it will package the 
         compiled files into a suitable archive file.  
+      
+    $0 shell {target}
+      - Mainly for debugging, open a shell in the container configured for the 
+        target compilation system.
       
     Targets can be specified as the below (all targets on the same line are just aliases).    
 
