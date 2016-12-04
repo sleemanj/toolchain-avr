@@ -21,6 +21,7 @@ Usage:
 
     Linux Targets:
         x86_64-linux-gnu, linux, x86_64, amd64      
+        i386-linux-gnu, linux32, i386
         arm-linux-gnueabi, arm, armv5      
         arm-linux-gnueabihf, armhf, armv7, armv7l      
         aarch64-linux-gnu, arm64, aarch64     
@@ -95,6 +96,19 @@ EOF
       chmod +x /usr/bin/$native    
     fi
   done
+}
+
+# Take a target and return the canonical cross triple for it, resolving aliases
+function canonical_cross_triple()
+{
+  case $1 in 
+    i386-linux-gnu|linux32|i386)
+      echo i386-linux-gnu
+    ;;
+  
+    *)
+      sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$1 $DOCKER_CONTAINER_NAME $0 _canonical_cross_triple
+  esac
 }
 
 case $1 in
@@ -213,7 +227,8 @@ case $1 in
     #   [Us (Build)] x [Host] x [avr]       
     # we need first to build
     #   [ Us ] x [avr]
-    # don't ask why, we just do OK
+    # this is both needed in order to build avr-gcc for [Host] and also
+    # ultimately because we need to build avr-libc using avr-gcc ourselves
     if ! [ -d objdir-$(uname -m) ]
     then
       echo "First we need to build avr-gcc for $(uname -m) as the cross compile needs it, doing that now."
@@ -221,7 +236,7 @@ case $1 in
       if sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$(uname -m) $DOCKER_CONTAINER_NAME $0 _compile $(uname -m)
       then
         mv objdir objdir-$(uname -m)
-        echo "The $(uname -m) compile is done, so now building avr-gcc for $2"
+        echo "The $(uname -m) compile is done, so now building for $2"
       else
         echo "The $(uname -m) compile failed, sorry." >&2
         exit 1
@@ -230,15 +245,23 @@ case $1 in
 
     # Check to see if the cross-compile we requested was not really a cross-compile, and if so
     # just use the straight compiled one (well, it's still a cross from build to avr, but anyway you know what I mean)
-    if [ "$(sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$2 $DOCKER_CONTAINER_NAME $0 _canonical_cross_triple)" =  "$(sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE==$(uname -m) $DOCKER_CONTAINER_NAME $0 _canonical_cross_triple)" ]
+    if [ "$(canonical_cross_triple $2)" =  "$(canonical_cross_triple "$(uname -m)")" ]
     then
       echo "... actually, we don't need to do that, just copying the one we already compiled for $(uname -m) as it is the same."
       rm -rf objdir
       cp -rp objdir-$(uname -m) objdir
       exit $?
     fi
-              
-    # Now we can call ourself in the docker and get the build happening
+     
+    # We have to fudge the call for i386-linux-gnu because multiarch/crossbuild doesn't natively support it
+    if [ "$(canonical_cross_triple $2)" = "i386-linux-gnu" ]
+    then
+      # The CROSS_TRIPLE here is a fake to satisfy the container's startup routine, _compile_linux32 will fix it
+      sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=x86_64-linux-gnu $DOCKER_CONTAINER_NAME $0 _compile_linux32 $2
+      exit $?      
+    fi
+    
+    # For all other cross compiles we are now ready to go
     sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$2 $DOCKER_CONTAINER_NAME $0 _compile $2
     exit $?  
     
@@ -254,7 +277,7 @@ case $1 in
     echo $CROSS_TRIPLE
     exit 0
   ;;
-
+  
   _compile)
     # This needs to be called from inside the container
     if [ -z "$CROSS_TRIPLE" ]
@@ -318,7 +341,47 @@ case $1 in
     echo "Your build is complete, the files are in objdir"
     exit 0
   ;;
-
+  
+  _compile_linux32)
+    # This needs to be called from inside the container
+    if [ -z "$CROSS_TRIPLE" ]
+    then
+      echo "$0: $1 needs to be called from inside the Docker container." >&2
+      exit 1
+    fi
+    
+    # Because of https://github.com/multiarch/crossbuild/issues/7
+    # multiarch/crossbuild doesn't quite support 32bit linux compilation
+    # but we can fix it on-the-fly by installing the multilib
+    # (which will kill cross compile ability but since this is a container
+    #  it doesn't matter as such things do not persist) and wrapping 
+    # gcc and g++ to tell them to do a 32bit compile
+    # Note that you will have to supply a "legal" CROSS_TRIPLE when starting
+    # the container (x86_64-linux-gnu will do) or the container will error out.
+    
+    CROSS_TRIPLE=i386-linux-gnu
+    sudo apt-get -y install gcc-multilib g++multi-lib
+    
+   for native in gcc g++
+  do
+    if [ -L /usr/bin/$native ]
+    then
+      NATIVE_BIN="$(realpath /usr/bin/$native)"
+      rm /usr/bin/$native
+      cat >/usr/bin/$native <<EOF
+#!/bin/bash
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export LD_LIBRARY_PATH=/usr/lib:/lib
+${NATIVE_BIN} -m32 "\$@"
+EOF
+      chmod +x /usr/bin/$native    
+    fi
+  done
+    
+    # Now we can carry on as normal
+    $0 _compile
+  ;;
+  
   *)    
     echo "$USAGE" >&2
     exit 1  
