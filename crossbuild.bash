@@ -99,9 +99,34 @@ EOF
 }
 
 # Take a target and return the canonical cross triple for it, resolving aliases
+# we define some extra aliases ourself, and also allow the aliases from crossbuild
 function canonical_cross_triple()
 {
   case $1 in 
+    linux64)
+      echo x86_64-linux-gnu
+    ;;
+    
+    windows64)
+      echo x86_64-w64-mingw32
+    ;;
+    
+    windows32)
+      echo i686-w64-mingw32
+    ;;
+    
+    mac64)
+      echo x86_64-apple-darwin
+    ;;
+    
+    mac64h)
+      echo x86_64h-apple-darwin
+    ;;
+    
+    mac32)
+      echo i386-apple-darwin
+    ;;
+      
     i386-linux-gnu|linux32|i386)
       echo i386-linux-gnu
     ;;

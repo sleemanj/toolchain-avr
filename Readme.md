@@ -15,7 +15,7 @@ At time of writing, the latest toolchain available is based on Atmel 3.5.4 versi
  - avr-libc-2.0.0
  - gdb-7.8
  
-### Building
+### Building - For Your Native System
 
 Setup has been done on partially set up development machines. If, trying to compile on your machine, you find any package missing from the following list, please open an issue at once! We all can't afford wasting time on setup :)
 
@@ -33,6 +33,55 @@ To package, after getting the requirements...
 ```bash
 ./package-avr-gcc.bash
 ```
+
+### Cross Compiling
+
+The Arduino IDE is available on a number of platforms so everything needs to be compiled for those other systems too.  To make this job a bit easier a cross compiling script is available.
+
+#### Requirements
+
+The crossbuild requires an Ubuntu 64bit Linux, (trusty, wily or xenial should be OK) with Kernel greater than 3.10 (those ubuntus should already qualify).
+
+Docker is required, however the script can install it for you.
+
+multiarch/crossbuild Docker container is required, however the script can install it for you.
+
+Docker runs as root, or requires root to run it, so you need sudo access.
+
+It is highly recommended that instead of doing this on your own machine, you spin up a beefy Amazon EC2 or similar VPS type of instance with a suitable Ubuntu on it.   The compilation process is long and CPU intensive, if you use an Amazon EC2 micro instance you will be there for days.
+
+#### Usage
+
+First if you don't have it you want to setup Docker
+
+    ./crossbuild.bash install-docker
+    
+Then the crossbuild environment
+
+    ./crossbuild.bash install-crossbuild
+    
+Then you can compile for a given target
+
+    ./crossbuild.bash compile {target}
+    
+The list of targets (not all tested!) can be obtained by 
+
+    ./crossbuild
+    
+but generally should be one of 
+
+  * linux64, linux32
+  * windows64, windows32
+  * mac64, mac64h, mac32
+  
+( note that mac64h is for Haswell - I don't know enough about architecture to know if mac64 works on 64h macs or not, maybe you don't need it )
+
+After some time, the compilation will complete (or fail, but let's assume it worked), the compiled toolchain for your target is in the objdir.  To package this toolchain into the relative archive, simply...
+
+    ./crossbuild package
+    
+after some zipping action, the package archive will be put into the `packages/` directory, with a suitable filename.
+
 
 #### Debian requirements
 
