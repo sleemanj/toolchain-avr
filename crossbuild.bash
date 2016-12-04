@@ -331,7 +331,7 @@ case $1 in
       echo "$0: $1 needs to be called from inside the Docker container." >&2
       exit 1
     fi
-    echo $CROSS_TRIPLE
+    echo -n $CROSS_TRIPLE
     exit 0
   ;;
     
