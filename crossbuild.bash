@@ -472,9 +472,10 @@ case $1 in
     # Compile the subunits in order, note that the tools are already done (outside of the container)
     for subunit in binutils gcc avr-libc gdb
     do
+      # If it's not built, or if it was built for a different target, (re)build
       if [ ! -d "${subunit}-build" ] || [ "$(cat "${subunit}-build/.build_target")" != "$CROSS_TRIPLE" ] 
       then
-        rm -rf binutils-build
+        rm -rf {subunit}-build
         if ! ./${subunit}.build.bash
         then
           echo "$0: Failed to compile ${subunit}" >&2
