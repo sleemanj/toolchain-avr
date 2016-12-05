@@ -120,7 +120,9 @@ function check_crossbuild()
 # $3 = Argument
 function run_in_docker()
 {
-    sudo docker run -it --rm -v /home:/home \
+    sudo docker run -it --rm \
+    -e RUN_AS_USERID="$(id -u)" RUN_AS_USERNAME="$(id -un)" \
+    -v /home:/home \
     -v $(submodule_patches_dir $1 binutils):$(pwd)/binutils-patches \
     -v $(submodule_patches_dir $1 avr-gcc):$(pwd)/avr-gcc-patches   \
     -v $(submodule_patches_dir $1 avr-libc):$(pwd)/avr-libc-patches \
@@ -133,6 +135,12 @@ function run_in_docker()
 # reset when the container exits, because that's how docker containers work.
 function tweak_docker_container()
 {
+  # If this is not being run as root, we can't do anything
+  if [ ! "$(whoami)" == "root" ]
+  then
+    return 0
+  fi
+  
   # Some extra tools we need that might not be in the container already
   apt-get update && apt-get -y install flex bison texinfo
 
@@ -195,6 +203,20 @@ function canonical_cross_triple()
   esac
 }
 
+
+function become_user()
+{
+  if [ "$(whoami)" == "root" ] && [ ! -z "$RUN_AS_USERID" ] && [ ! -z "$RUN_AS_USERNAME" ]
+  then    
+    useradd  --no-create-home --uid $RUN_AS_USERID $RUN_AS_USERNAME
+    RUN_AS_USERID="" ENV_PATH="$PATH" su -p $RUN_AS_USERNAME --$0 "$@"
+    
+    # The sub process does all the work, we just exit with it's return code
+    exit $?
+  fi
+  
+  return 0
+}
 
 # The main program logic here, the actions prefixed with an underscore are executed
 # INSIDE the container, and should only be called from the outside container actions
@@ -410,13 +432,17 @@ case $1 in
       echo "$0: $1 needs to be called from inside the Docker container." >&2
       exit 1
     fi
-
+        
     # Make sure our container has the stuff we need
     tweak_docker_container
     
+    # At this point we don't have to be root, so become the proper user
+    # so that our files don't become root owned annoyingly
+    become_user
+    
     PATH="$(pwd)/objdir-$(uname -m)/bin:$PATH"
     LD_LIBRARY_PATH="$(pwd)/objdir-$(uname -m)/lib:$LD_LIBRARY_PATH"
-    
+            
     # When compiling binutils and avr-gcc it needs to compile some stuff in the 
     # container for use in the container, we have to explicitly point it to the
     # right compiler to use (crossbuild has prepended the crosses in the path)
@@ -446,7 +472,11 @@ case $1 in
 
     # Make sure our container has the stuff we need
     tweak_docker_container
-
+    
+    # At this point we don't have to be root, so become the proper user
+    # so that our files don't become root owned annoyingly
+    become_user
+    
     PATH="$(pwd)/objdir-$(uname -m)/bin:$PATH"
     LD_LIBRARY_PATH="$(pwd)/objdir-$(uname -m)/lib:$LD_LIBRARY_PATH"
     
