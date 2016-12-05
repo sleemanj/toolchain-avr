@@ -1,3 +1,22 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [AVR Toolchain for Arduino](#avr-toolchain-for-arduino)
+  - [Configuring](#configuring)
+  - [Building - For Your Native System](#building---for-your-native-system)
+    - [Debian requirements](#debian-requirements)
+    - [Mac OSX requirements](#mac-osx-requirements)
+    - [Windows requirements](#windows-requirements)
+  - [Cross Compiling](#cross-compiling)
+    - [Requirements](#requirements)
+    - [Usage](#usage)
+  - [Upstream credits](#upstream-credits)
+  - [Credits](#credits)
+  - [License](#license)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ## AVR Toolchain for Arduino
 
 This is the AVR Toolchain used in the [Arduino IDE](http://arduino.cc/).
@@ -33,6 +52,55 @@ To package, after getting the requirements...
 ```bash
 ./package-avr-gcc.bash
 ```
+
+#### Debian requirements
+
+```bash
+sudo apt-get install build-essential gperf bison subversion texinfo zip automake flex libtinfo-dev pkg-config
+```
+
+#### Mac OSX requirements
+
+You need to install MacPorts: https://www.macports.org/install.php. Once done, open a terminal and type:
+
+```bash
+sudo port selfupdate
+sudo port upgrade outdated
+sudo port install wget +universal
+sudo port install automake +universal
+sudo port install autoconf +universal
+sudo port install gpatch +universal
+```
+
+#### Windows requirements
+
+You need to install Cygwin: http://www.cygwin.com/. Once you have run `setup-x86.exe`, use the `Search` text field to filter and select for installation the following packages:
+
+- git
+- wget
+- unzip
+- zip
+- gperf
+- bison
+- flex
+- make
+- patch
+- automake
+- autoconf
+- gcc-g++
+- texinfo (must be at version 4.13 since 5+ won't work)
+- libncurses-devel
+
+A note on texinfo: due to dependencies, each time you update/modify your cygwin installation (for example: you install an additional package), texinfo will be upgraded to version 5+, while you need version 4+!
+Easy solution: as soon as you've installed the additional package, re-run cygwin setup, search texinfo, triple click on "Keep" until you read version 4, then click next.
+
+You also need to install MinGW: http://www.mingw.org/. Once you have run mingw-get-setup.exe, select and install (clicking on "Installation" -> "Apply changes") the following packages:
+
+- mingw-developer-toolkit
+- mingw32-base
+- mingw32-gcc-g++
+- msys-base
+- msys-zip
 
 ### Cross Compiling
 
@@ -87,55 +155,6 @@ If somethng goes wrong with the compile, you might want to get a shell into the 
     ./crossbuild shell {target}
     
 then you can try and resolve the issue.  Remember that this is a Docker Container, any changes you make to the system will not persist once you exit the container - except in the toolchain directory which is (sort of) loopback mounted into the container.  Note that the patches directories are also not persistent, see the `submodule_patches_dir()` function in `crossbuild.bash` for why that is.
-
-#### Debian requirements
-
-```bash
-sudo apt-get install build-essential gperf bison subversion texinfo zip automake flex libtinfo-dev pkg-config
-```
-
-#### Mac OSX requirements
-
-You need to install MacPorts: https://www.macports.org/install.php. Once done, open a terminal and type:
-
-```bash
-sudo port selfupdate
-sudo port upgrade outdated
-sudo port install wget +universal
-sudo port install automake +universal
-sudo port install autoconf +universal
-sudo port install gpatch +universal
-```
-
-#### Windows requirements
-
-You need to install Cygwin: http://www.cygwin.com/. Once you have run `setup-x86.exe`, use the `Search` text field to filter and select for installation the following packages:
-
-- git
-- wget
-- unzip
-- zip
-- gperf
-- bison
-- flex
-- make
-- patch
-- automake
-- autoconf
-- gcc-g++
-- texinfo (must be at version 4.13 since 5+ won't work)
-- libncurses-devel
-
-A note on texinfo: due to dependencies, each time you update/modify your cygwin installation (for example: you install an additional package), texinfo will be upgraded to version 5+, while you need version 4+!
-Easy solution: as soon as you've installed the additional package, re-run cygwin setup, search texinfo, triple click on "Keep" until you read version 4, then click next.
-
-You also need to install MinGW: http://www.mingw.org/. Once you have run mingw-get-setup.exe, select and install (clicking on "Installation" -> "Apply changes") the following packages:
-
-- mingw-developer-toolkit
-- mingw32-base
-- mingw32-gcc-g++
-- msys-base
-- msys-zip
 
 ### Upstream credits
 
