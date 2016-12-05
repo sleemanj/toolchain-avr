@@ -20,11 +20,17 @@ Usage:
     $0 shell {target}
       - Mainly for debugging, open a shell in the container configured for the 
         target compilation system.
-      
-    Targets can be specified as the below (all targets on the same line are just aliases).    
+
+Targets:
+
+    Most commonly you will want to use one of these aliases for the target
+    
+        linux32, linux64, win32, win64, mac32, mac64, mac64h
+        
+    Other targets can be specified as the below (all targets on the same line are just aliases).    
 
     Linux Targets:
-        x86_64-linux-gnu, linux, x86_64, amd64      
+        x86_64-linux-gnu, linux, x86_64, amd64, linux64      
         i386-linux-gnu, linux32, i386
         arm-linux-gnueabi, arm, armv5      
         arm-linux-gnueabihf, armhf, armv7, armv7l      
@@ -33,14 +39,29 @@ Usage:
         powerpc64le-linux-gnu, powerpc, powerpc64, powerpc64le     
  
     Macintosh Targets:
-        x86_64-apple-darwin, osx, osx64, darwin, darwin64      
-        x86_64h-apple-darwin, osx64h, darwin64h, x86_64h      
-        i386-apple-darwin, osx32, darwin32      
+        x86_64-apple-darwin, osx, osx64, darwin, darwin64, mac64      
+        x86_64h-apple-darwin, osx64h, darwin64h, x86_64h, mac64h
+        i386-apple-darwin, osx32, darwin32, mac32
         *-apple-darwin      
 
     Windows Targets:
-        x86_64-w64-mingw32, windows, win64      
-        i686-w64-mingw32, win32
+        x86_64-w64-mingw32, windows, win64, windows64
+        i686-w64-mingw32, win32, windows32
+
+Environment Variables:
+
+    You may also set the following environment variables.
+    
+    CROSSBUILD_NO_UPDATE=1 
+      - Do not do an "apt-get update" when starting the container
+      
+    CROSSBUILD_NO_INSTALL=1
+      - Do not install additional packages when starting the container
+
+Example:
+
+    CROSSBUILD_NO_UPDATE=1 $0 compile windows    
+  
 EOF
 )"
 
@@ -122,6 +143,7 @@ function run_in_docker()
 {
     sudo docker run -it --rm \
     -e RUN_AS_USERID="$(id -u)" -e RUN_AS_USERNAME="$(id -un)" \
+    -e CROSSBUILD_NO_UPDATE="$CROSSBUILD_NO_UPDATE" -e CROSSBUILD_NO_INSTALL="$CROSSBUILD_NO_INSTALL" \
     -v /home:/home \
     -v $(submodule_patches_dir $1 binutils):$(pwd)/binutils-patches \
     -v $(submodule_patches_dir $1 avr-gcc):$(pwd)/avr-gcc-patches   \
@@ -142,7 +164,8 @@ function tweak_docker_container()
   fi
   
   # Some extra tools we need that might not be in the container already
-  apt-get update && apt-get -y install flex bison texinfo
+  [ -z "$CROSSBUILD_NO_UPDATE" ]  && apt-get update 
+  [ -z "$CROSSBUILD_NO_INSTALL" ] && apt-get -y install flex bison texinfo
 
   # We need to be able to compile stuff for the container, in the container
   # https://github.com/multiarch/crossbuild/issues/26
@@ -208,8 +231,8 @@ function become_user()
 {
   if [ "$(whoami)" == "root" ] && [ ! -z "$RUN_AS_USERID" ] && [ ! -z "$RUN_AS_USERNAME" ]
   then    
-    useradd  --no-create-home --uid $RUN_AS_USERID $RUN_AS_USERNAME
-    RUN_AS_USERID="" ENV_PATH="$PATH" su -p $RUN_AS_USERNAME -- $0 "$@"
+    useradd  --uid $RUN_AS_USERID $RUN_AS_USERNAME
+    HOME="/home/$RUN_AS_USERNAME" RUN_AS_USERID="" ENV_PATH="$PATH" SHELL="$SHELL" su -p -l $RUN_AS_USERNAME -- $0 "$@"
     
     # The sub process does all the work, we just exit with it's return code
     exit $?
@@ -438,7 +461,13 @@ case $1 in
     
     # At this point we don't have to be root, so become the proper user
     # so that our files don't become root owned annoyingly
-    become_user
+    # Actually, no don't do this, login to the container as root for 2 reasons
+    #  1. we don't have sudo, so if you logged in as non-root you couldn't 
+    #     become root
+    #  2. bash loses tty control and can't do job control, so you can't do 
+    #     ctrl-z etc - I don't know how to solve that    
+    #
+    # become_user "$@"
     
     PATH="$(pwd)/objdir-$(uname -m)/bin:$PATH"
     LD_LIBRARY_PATH="$(pwd)/objdir-$(uname -m)/lib:$LD_LIBRARY_PATH"
@@ -475,7 +504,7 @@ case $1 in
     
     # At this point we don't have to be root, so become the proper user
     # so that our files don't become root owned annoyingly
-    become_user
+    become_user "$@"
     
     PATH="$(pwd)/objdir-$(uname -m)/bin:$PATH"
     LD_LIBRARY_PATH="$(pwd)/objdir-$(uname -m)/lib:$LD_LIBRARY_PATH"
