@@ -61,7 +61,7 @@ CONFARGS=" \
 	--enable-lto \
 	--enable-plugins\
 	--with-pic \
-	--target=avr"
+	--target=avr $CONFARGS"
 
 CFLAGS="-w -O2 -g0 $CFLAGS" CXXFLAGS="-w -O2 -g0 $CXXFLAGS" LDFLAGS="-s $LDFLAGS" ../binutils/configure $CONFARGS
 

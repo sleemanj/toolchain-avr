@@ -57,7 +57,7 @@ CONFARGS=" \
 	--disable-nls \
 	--disable-werror \
 	--disable-binutils \
-	--target=avr"
+	--target=avr $CONFARGS"
 
 CFLAGS="-w -O2 -g0 $CFLAGS" CXXFLAGS="-w -O2 -g0 $CXXFLAGS" LDFLAGS="-s $LDFLAGS" ../gdb/configure $CONFARGS
 
