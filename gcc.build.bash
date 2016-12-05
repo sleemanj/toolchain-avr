@@ -50,6 +50,13 @@ fi
 
 tar xfv mpc-${MPC_VERSION}.tar.gz
 
+if [[ ! -f ncurses-${NCURSES_VERSION}.tar.gz  ]] ;
+then
+  wget ${NCURSES_SOURCE}
+fi
+
+tar xfv ncurses-${NCURSES_VERSION}.tar.gz
+
 if [[ ! -f avr-gcc.tar.bz2 ]] ;
 then
 	wget $AVR_SOURCES/avr-gcc.tar.bz2
@@ -75,6 +82,7 @@ popd
 mv gmp-5.0.2 gcc/gmp
 mv mpfr-3.0.0 gcc/mpfr
 mv mpc-0.9 gcc/mpc
+mv ncurses-${NCURSES_VERSION} gcc/ncurses
 
 mkdir -p objdir
 cd objdir
