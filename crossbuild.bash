@@ -209,7 +209,7 @@ function become_user()
   if [ "$(whoami)" == "root" ] && [ ! -z "$RUN_AS_USERID" ] && [ ! -z "$RUN_AS_USERNAME" ]
   then    
     useradd  --no-create-home --uid $RUN_AS_USERID $RUN_AS_USERNAME
-    RUN_AS_USERID="" ENV_PATH="$PATH" su -p $RUN_AS_USERNAME --$0 "$@"
+    RUN_AS_USERID="" ENV_PATH="$PATH" su -p $RUN_AS_USERNAME -- $0 "$@"
     
     # The sub process does all the work, we just exit with it's return code
     exit $?
