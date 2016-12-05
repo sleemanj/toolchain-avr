@@ -25,8 +25,8 @@ Targets:
 
     Most commonly you will want to use one of these aliases for the target
     
-        linux32, linux64, win32, win64, mac32, mac64, mac64h
-        
+        linux32, linux64, win32, win64, mac32, mac64, mac64h, armhf
+                
     Other targets can be specified as the below (all targets on the same line are just aliases).    
 
     Linux Targets:
@@ -435,7 +435,75 @@ case $1 in
     run_in_docker $(canonical_cross_triple $2) _compile $2
     exit $?      
   ;;
-   
+  
+  package)
+    if [ ! -z "$CROSS_TRIPLE" ]
+    then
+      echo "$0: $1 needs to be called from outside the Docker container." >&2
+      exit 1
+    fi
+    
+    if [ ! -f objdir/.build_target ]
+    then
+      echo "$USAGE" >&2
+      echo          >&2
+      echo "$0: You must first compile a target before it can be packaged." >&2
+      exit 1
+    fi
+    
+    CANONICAL_TRIPLE=$(cat objdir/.build_target)
+    
+    if [ ! -d packages ]
+    then
+      mkdir packages
+    fi
+          
+    source build.conf >/dev/null
+    OUTPUT_VERSION=${GCC_VERSION}-atmel${AVR_VERSION}-${BUILD_NUMBER}
+    
+    # To keep things the same as the arduino way, I don't know how they are picking
+    # the right package or whatever, we will make the filenames as per package-avr-gcc.bash would
+    OUTPUT_TAG=
+    case $CANONICAL_TRIPLE in
+    
+      x86_64-linux-gnu)    OUTPUT_TAG=x86_64-pc-linux-gnu ;;
+      i386-linux-gnu)      OUTPUT_TAG=i686-pc-linux-gnu   ;; # FIXME ?
+      arm-linux-gnueabihf) OUTPUT_TAG=armhf-pc-linux-gnu  ;;
+            
+      # Note, it looks like Arduino is only distributing 32bit compiles of toolchain for 
+      # Windows and Mac at time of writing (IDE 1.6.13 current)      
+      i686-w64-mingw32)    OUTPUT_TAG=i686-mingw32        ;;
+      i386-apple-darwin)   OUTPUT_TAG=i386-apple-darwin11 ;;
+            
+      *)                   OUTPUT_TAG=$CANONICAL_TRIPLE   ;;
+    esac
+    
+    mv objdir avr
+          
+    # Windows gets a zip, everybody else uses tar.bz2
+    OUTPUT_FILE=
+    if echo "$CANONICAL_TRIPLE" | grep -P "mingw" >/dev/null
+    then
+      # For some reason the package-avr-gcc.bash pulls in a precompiled libiconv-2.dll
+      # for the windows build, I guess we better do that too
+      BINARY_FOLDERS=`find avr -name *.exe -print0 | xargs -0 -n1 dirname | sort --unique`
+      echo $BINARY_FOLDERS | xargs -n1 cp toolchain-precompiled/*
+      
+      OUTPUT_FILE="avr-gcc-${OUTPUT_VERSION}-${OUTPUT_TAG}.zip"
+      rm -f  $OUTPUT_FILE
+      zip -r $OUTPUT_FILE avr       1>&2
+    else
+      OUTPUT_FILE="avr-gcc-${OUTPUT_VERSION}-${OUTPUT_TAG}.tar.bz2"
+      rm -f  $OUTPUT_FILE   
+      tar -cjvf  $OUTPUT_FILE avr   1>&2
+    fi
+    
+    mv $OUTPUT_FILE packages/
+    mv avr objdir
+    
+    echo packages/$OUTPUT_FILE
+  ;;
+  
   _canonical_cross_triple)
     # This needs to be called from inside the container
     if [ -z "$CROSS_TRIPLE" ]
