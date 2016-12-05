@@ -82,6 +82,11 @@ After some time, the compilation will complete (or fail, but let's assume it wor
     
 after some zipping action, the package archive will be put into the `packages/` directory, with a suitable filename.
 
+If somethng goes wrong with the compile, you might want to get a shell into the crossbuild container with
+
+    ./crossbuild shell {target}
+    
+then you can try and resolve the issue.  Remember that this is a Docker Container, any changes you make to the system will not persist once you exit the container - except in the toolchain directory which is (sort of) loopback mounted into the container.  Note that the patches directories are also not persistent, see the `submodule_patches_dir()` function in `crossbuild.bash` for why that is.
 
 #### Debian requirements
 
