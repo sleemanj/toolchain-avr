@@ -121,7 +121,7 @@ function check_crossbuild()
 function run_in_docker()
 {
     sudo docker run -it --rm \
-    -e RUN_AS_USERID="$(id -u)" RUN_AS_USERNAME="$(id -un)" \
+    -e RUN_AS_USERID="$(id -u)" -e RUN_AS_USERNAME="$(id -un)" \
     -v /home:/home \
     -v $(submodule_patches_dir $1 binutils):$(pwd)/binutils-patches \
     -v $(submodule_patches_dir $1 avr-gcc):$(pwd)/avr-gcc-patches   \
