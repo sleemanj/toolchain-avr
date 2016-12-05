@@ -44,13 +44,48 @@ Usage:
 EOF
 )"
 
-
+# The crossbuild container name, if blank we'll figure it out
+#  typically multiarch/crossbuild:dev
 DOCKER_CONTAINER_NAME=
-# DOCKER_CONTAINER_NAME=multiarch/crossbuild:dev
 
+
+# For some crosses we might need to disable patches so we use this function 
+# to create a patches directory copy the patches we do want into it and 
+# echo that directory, this will then be loopback mounted into the container 
+# over the original patches
+#
+# $1 = Canonical Cross Triple
+# $2 = Submodule
+function submodule_patches_dir()
+{
+  # If there are no patches for this submodule, just use an empty directory
+  if [ ! -d $2-patches ]
+  then
+    [ ! -d /tmp/no-patches ] && mkdir /tmp/no-patches
+    echo -n /tmp/no-patches
+    return 0
+  fi
+  
+  # Copy the patches across into a temporary directory
+  rm -rf /tmp/$2-patches
+  cp -rp $2-patches /tmp/$2-patches
+  
+  # Remove patches we don't want
+  case $2 in
+    avr-gdb-patches)
+    
+     if echo "$1" | grep "mingw" >/dev/null
+     then
+       rm -f /tmp/$2-patches/01-mingw-libtermcap*
+     fi        
+  esac
+  
+  echo -n /tmp/$2-patches
+}
+
+# Check that there is a working Docker installed
 function check_docker()
 {
-  # First you must have a working docker setup with the multiarch/crossbuild container
   if ! which docker
   then
     echo "$0: Docker is not installed, try \"$0 install-docker\" for an auto install" >&2
@@ -60,8 +95,10 @@ function check_docker()
   fi
 }
 
+# Check to see that the crossbuild dockert container is installed, and update
+# DOCKER_CONTAINER_NAME
 function check_crossbuild()
-{
+{  
   if [ -z "$DOCKER_CONTAINER_NAME" ]
   then
     DOCKER_CONTAINER_NAME="$(sudo docker images multiarch/crossbuild --format "{{.Repository}}:{{.Tag}}")"
@@ -76,7 +113,24 @@ function check_crossbuild()
   fi
 }
 
+
+# Run a command in the Docker container
+# $1 = Canonical Cross Triple
+# $2 = Command
+# $3 = Argument
+function run_in_docker()
+{
+    sudo docker run -it --rm -v /home:/home \
+    -v $(submodule_patches_dir $1 binutils):$(pwd)/binutils-patches \
+    -v $(submodule_patches_dir $1 avr-gcc):$(pwd)/avr-gcc-patches   \
+    -v $(submodule_patches_dir $1 avr-libc):$(pwd)/avr-libc-patches \
+    -v $(submodule_patches_dir $1 avr-gdb):$(pwd)/avr-gdb-patches   \
+    -w $(pwd) -e CROSS_TRIPLE=$1 $DOCKER_CONTAINER_NAME $0 $2 $3
+}
+
 # The crossbuild container needs some tweaks for us.
+# this is done from INSIDE the container.  Note that the changes are
+# reset when the container exits, because that's how docker containers work.
 function tweak_docker_container()
 {
   # Some extra tools we need that might not be in the container already
@@ -136,11 +190,21 @@ function canonical_cross_triple()
     ;;
   
     *)
-      sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$1 $DOCKER_CONTAINER_NAME $0 _canonical_cross_triple
+      run_in_docker $1 _canonical_cross_triple
+      # sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$1 $DOCKER_CONTAINER_NAME $0 _canonical_cross_triple
   esac
 }
 
+
+# The main program logic here, the actions prefixed with an underscore are executed
+# INSIDE the container, and should only be called from the outside container actions
+# not by the user directly.
 case $1 in
+  help)
+    echo "$USAGE"
+    exit 0
+  ;;
+  
   install-docker)
     # Only Ubuntu supported
     if ! [ "$(lsb_release -is)" = "Ubuntu" ]
@@ -252,7 +316,7 @@ case $1 in
       fi    
     fi
     
-    sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$(canonical_cross_triple $2) $DOCKER_CONTAINER_NAME $0 _shell
+    run_in_docker $(canonical_cross_triple $2) _shell    
   ;;
   
   compile)
@@ -294,7 +358,7 @@ case $1 in
     then
       echo "First we need to build avr-gcc for $(uname -m) as the cross compile needs it, doing that now."
       
-      if sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$(uname -m) $DOCKER_CONTAINER_NAME $0 _compile $(uname -m)
+      if run_in_docker $(uname -m) _compile $(uname -m)
       then
         mv objdir objdir-$(uname -m)
         echo "The $(uname -m) compile is done, so now building for $2"
@@ -318,14 +382,13 @@ case $1 in
     if [ "$(canonical_cross_triple $2)" = "i386-linux-gnu" ]
     then
       # The CROSS_TRIPLE here is a fake to satisfy the container's startup routine, _compile_linux32 will fix it
-      sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=x86_64-linux-gnu $DOCKER_CONTAINER_NAME $0 _compile_linux32 $2
+      run_in_docker x86_64-linux-gnu _compile_linux32 $2      
       exit $?      
     fi
     
     # For all other cross compiles we are now ready to go
-    sudo docker run -it --rm -v /home:/home -w $(pwd) -e CROSS_TRIPLE=$(canonical_cross_triple $2) $DOCKER_CONTAINER_NAME $0 _compile $2
-    exit $?  
-    
+    run_in_docker $(canonical_cross_triple $2) _compile $2
+    exit $?      
   ;;
    
   _canonical_cross_triple)
@@ -335,6 +398,7 @@ case $1 in
       echo "$0: $1 needs to be called from inside the Docker container." >&2
       exit 1
     fi
+    
     echo -n $CROSS_TRIPLE
     exit 0
   ;;
