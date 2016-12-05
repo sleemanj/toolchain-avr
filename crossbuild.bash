@@ -466,16 +466,17 @@ case $1 in
     # added in the build scripts.
     export CONFARGS="--build=$(uname -m)-pc-linux-gnu --host=$CROSS_TRIPLE $CONFARGS"
     
-    # Everything cleaned up, except toolsdir which we keep
-    rm -rf gcc gmp-${GMP_VERSION} mpc-${MPC_VERSION} mpfr-${MPFR_VERSION} binutils avr-libc libc avr8-headers gdb objdir
+    # Remove some stuff that might be left from last time, including the previous objdir
+    rm -rf gmp-${GMP_VERSION} mpc-${MPC_VERSION} mpfr-${MPFR_VERSION} libc avr8-headers objdir
         
     # Compile the subunits in order, note that the tools are already done (outside of the container)
     for subunit in binutils gcc avr-libc gdb
     do
       # If it's not built, or if it was built for a different target, (re)build
       if [ ! -d "${subunit}-build" ] || [ "$(cat "${subunit}-build/.build_target")" != "$CROSS_TRIPLE" ] 
-      then
-        rm -rf ${subunit}-build
+      then      
+        # Make sure we clear out both the source and build directories so they are properly reconfig'd
+        rm -rf ${subunit} ${subunit}-build
         if ! ./${subunit}.build.bash
         then
           echo "$0: Failed to compile ${subunit}" >&2
