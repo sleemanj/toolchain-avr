@@ -72,7 +72,7 @@ function submodule_patches_dir()
   
   # Remove patches we don't want
   case $2 in
-    avr-gdb-patches)
+    avr-gdb)
     
      if echo "$1" | grep "mingw" >/dev/null
      then
