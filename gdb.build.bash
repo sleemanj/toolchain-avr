@@ -37,11 +37,15 @@ fi
 tar xfv avr-gdb.tar.bz2
 
 cd gdb
-for p in ../avr-gdb-patches/*.patch
-do
-	echo Applying $p
-	patch -p1 < $p
-done
+# If there are patches, apply them
+if [ ! -z "$(ls ../avr-gdb-patches/*.patch 2>/dev/null)" ]
+then
+  for p in ../avr-gdb-patches/*.patch
+  do
+    echo Applying $p
+    patch -p1 < $p
+  done
+fi
 cd -
 
 mkdir -p objdir
